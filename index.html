@@ -139,7 +139,6 @@
     border: 1px solid var(--border-soft);
   }
   .post-time svg { width: 12px; height: 12px; color: var(--accent); }
-  .post-time.no-time { color: var(--text-dim); font-style: italic; font-weight: 500; }
 
   .menu-btn {
     background: transparent; border: none;
@@ -152,7 +151,6 @@
     flex-shrink: 0;
   }
   .menu-btn:active { background: var(--surface2); }
-  .menu-btn:disabled { opacity: 0.25; cursor: not-allowed; }
   .menu-btn svg { width: 18px; height: 18px; }
 
   .post-body { display: flex; gap: 12px; align-items: flex-start; }
@@ -166,22 +164,7 @@
     position: relative;
     border: 1px solid var(--border-soft);
   }
-  .media-track {
-    display: flex; width: 100%; height: 100%;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    scroll-behavior: smooth;
-  }
-  .media-track::-webkit-scrollbar { display: none; }
-  .media-slide {
-    flex: 0 0 100%;
-    width: 100%; height: 100%;
-    scroll-snap-align: start;
-    background: var(--surface2);
-    position: relative;
-  }
-  .media-slide img, .media-slide video {
+  .media-wrap img, .media-wrap video {
     width: 100%; height: 100%;
     object-fit: cover; display: block;
   }
@@ -206,27 +189,6 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
-  .media-counter {
-    position: absolute; top: 4px; right: 4px;
-    background: rgba(0,0,0,0.65);
-    color: #fff;
-    font-size: 9px; font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 10px;
-  }
-  .media-dots {
-    position: absolute; bottom: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex; gap: 3px;
-  }
-  .media-dot {
-    width: 4px; height: 4px;
-    background: rgba(255,255,255,0.55);
-    border-radius: 50%;
-    transition: background 0.2s, transform 0.2s;
-  }
-  .media-dot.active { background: #fff; transform: scale(1.2); }
   .media-empty {
     width: 100%; height: 100%;
     display: flex; align-items: center; justify-content: center;
@@ -423,13 +385,12 @@
   if (tg) { tg.ready(); tg.expand(); }
 
   var params = new URLSearchParams(window.location.search);
-  var resumeUrl     = params.get('resumeUrl')     || '';
-  var pollingUrl    = params.get('pollingUrl')    || '';
-  var editUrl       = params.get('editUrl')       || resumeUrl;
-  var deleteUrl     = params.get('deleteUrl')     || resumeUrl;
-  var chatId        = params.get('chatId')        || '';
-  var spreadsheetId = params.get('spreadsheetId') || '';
-  var sheetName     = params.get('sheetName')     || '';
+  var resumeUrl       = params.get('resumeUrl')       || '';
+  var pollingUrl      = params.get('pollingUrl')      || '';
+  var editUrl         = params.get('editUrl')         || resumeUrl;
+  var deleteUrl       = params.get('deleteUrl')       || resumeUrl;
+  var chatId          = params.get('chatId')          || '';
+  var profileUsername = params.get('profileUsername') || '';
 
   var posts = [];
 
@@ -463,6 +424,9 @@
     setTimeout(function() { toast.classList.remove('show'); }, 2200);
   }
 
+  // ════════════════════════════════════════════════════
+  // POLLING
+  // ════════════════════════════════════════════════════
   var pollAttempts = 0;
   var MAX_POLL_ATTEMPTS = 24;
 
@@ -473,9 +437,8 @@
       return;
     }
     var pollParams = {
-      chatId:        chatId,
-      spreadsheetId: spreadsheetId,
-      sheetName:     sheetName
+      chatId:          chatId,
+      profileUsername: profileUsername
     };
     var pollQs = Object.keys(pollParams).map(function(k) {
       return encodeURIComponent(k) + '=' + encodeURIComponent(pollParams[k] == null ? '' : pollParams[k]);
@@ -502,112 +465,89 @@
       });
   }
 
-  function parseLinks(linkStr) {
-    if (!linkStr) return [];
-    return String(linkStr)
-      .split(/[\n,]+/)
-      .map(function(s) { return s.trim(); })
-      .filter(function(s) { return s.length > 0 && /^https?:\/\//i.test(s); });
-  }
-
-  function parsePlatforms(platformsStr) {
-    if (!platformsStr) return [];
-    return String(platformsStr)
-      .split(/[,،\n]+/)
-      .map(function(s) { return s.trim(); })
-      .filter(function(s) { return s.length > 0; });
-  }
-
-  function parseJobIds(jobIdStr) {
-    if (!jobIdStr) return [];
-    return String(jobIdStr)
-      .split(/[,\s]+/)
-      .map(function(s) { return s.trim(); })
-      .filter(function(s) { return s.length > 0; });
-  }
-
-  function isVideo(url) {
-    return /\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i.test(url);
-  }
-
+  // ════════════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════════════
   function platformKey(name) {
     var n = String(name || '').toLowerCase().trim();
-    if (/אינסט|insta|ig\b/.test(n)) return 'instagram';
-    if (/פייס|facebook|fb\b/.test(n)) return 'facebook';
-    if (/טיקטוק|tiktok/.test(n)) return 'tiktok';
-    if (/לינקדאין|לינקדין|linkedin/.test(n)) return 'linkedin';
-    if (/טוויטר|twitter|\bx\b/.test(n)) return 'twitter';
-    if (/יוטיוב|youtube/.test(n)) return 'youtube';
-    if (/threads|טרדס/.test(n)) return 'threads';
-    if (/pinterest|פינטרסט/.test(n)) return 'pinterest';
+    if (/instagram|insta|ig\b/.test(n)) return 'instagram';
+    if (/facebook|fb\b/.test(n)) return 'facebook';
+    if (/tiktok/.test(n)) return 'tiktok';
+    if (/linkedin/.test(n)) return 'linkedin';
+    if (/twitter|\bx\b/.test(n)) return 'twitter';
+    if (/youtube|yt\b/.test(n)) return 'youtube';
+    if (/threads/.test(n)) return 'threads';
+    if (/pinterest/.test(n)) return 'pinterest';
     return 'unknown';
   }
 
-  function parseDateTime(raw) {
-    if (!raw || !String(raw).trim()) {
-      return { display: 'לא מתוזמן', date: '', time: '', dateKey: '', dateDisplay: '', isScheduled: false };
-    }
-    var s = String(raw).trim();
-    var dmy = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    var t = s.match(/(\d{1,2}):(\d{2})/);
-    var date = dmy ? (dmy[1].padStart(2,'0') + '/' + dmy[2].padStart(2,'0') + '/' + dmy[3]) : '';
-    var time = t ? (t[1].padStart(2,'0') + ':' + t[2]) : '';
+  // Parse the schedule date - prefer original_scheduled_str (which is in client's tz)
+  function parseSchedule(post) {
+    // original_scheduled_str format: "2026-04-28T20:23"
+    // scheduled_date format (UTC): "2026-04-28T17:23:00"
+    var orig = post.original_scheduled_str || '';
+    var utc  = post.scheduled_date || '';
 
-    if (!date) {
-      var hebMonths = {
-        'ינואר':'01','פברואר':'02','מרץ':'03','אפריל':'04','מאי':'05','יוני':'06',
-        'יולי':'07','אוגוסט':'08','ספטמבר':'09','אוקטובר':'10','נובמבר':'11','דצמבר':'12'
-      };
-      var hm = s.match(/(\d{1,2})\s*ב?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)\s*(\d{4})/);
-      if (hm) {
-        date = hm[1].padStart(2,'0') + '/' + hebMonths[hm[2]] + '/' + hm[3];
-      }
+    var dateStr = orig || utc;
+    if (!dateStr) {
+      return { date: '', time: '', dateKey: '', dateDisplay: '', isScheduled: false };
     }
 
-    var dateKey = '';
+    // Extract YYYY-MM-DD and HH:MM
+    var m = String(dateStr).match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+    if (!m) return { date: '', time: '', dateKey: '', dateDisplay: '', isScheduled: false };
+
+    var year = m[1], month = m[2], day = m[3], hour = m[4], min = m[5];
+    var date = day + '/' + month + '/' + year;
+    var time = hour + ':' + min;
+    var dateKey = year + '-' + month + '-' + day;
+
     var dateDisplay = '';
-    if (date) {
-      var parts = date.split('/');
-      dateKey = parts[2] + '-' + parts[1] + '-' + parts[0];
-      try {
-        var d = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
-        var dayNames = ['יום ראשון','יום שני','יום שלישי','יום רביעי','יום חמישי','יום שישי','שבת'];
-        var monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-        dateDisplay = dayNames[d.getDay()] + ', ' + parseInt(parts[0],10) + ' ב' + monthNames[parseInt(parts[1],10)-1] + ' ' + parts[2];
-      } catch (e) {
-        dateDisplay = date;
-      }
+    try {
+      var d = new Date(parseInt(year,10), parseInt(month,10)-1, parseInt(day,10));
+      var dayNames = ['יום ראשון','יום שני','יום שלישי','יום רביעי','יום חמישי','יום שישי','שבת'];
+      var monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+      dateDisplay = dayNames[d.getDay()] + ', ' + parseInt(day,10) + ' ב' + monthNames[parseInt(month,10)-1] + ' ' + year;
+    } catch (e) {
+      dateDisplay = date;
     }
-
-    var display = '';
-    if (date && time) display = date + ' • ' + time;
-    else if (date) display = date;
-    else if (time) display = time;
-    else display = s;
 
     return {
-      display: display,
-      date: date,
-      time: time,
-      dateKey: dateKey,
+      date:        date,
+      time:        time,
+      dateKey:     dateKey,
       dateDisplay: dateDisplay,
-      isScheduled: !!(date || time)
+      isScheduled: true
     };
   }
 
-  function postTypeLabel(type) {
-    if (!type) return '';
-    return String(type).trim();
+  function isVideo(post) {
+    if (post.post_type === 'video') return true;
+    var url = post.preview_url || '';
+    return /\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i.test(url);
   }
 
-  function renderPosts() {
-    var visiblePosts = posts.filter(function(p) {
-      var hasLink = !!parseLinks(p['לינק'] || p.link || '').length;
-      var dt = parseDateTime(p['תאריך ושעה '] || p['תאריך ושעה'] || '');
-      return hasLink && dt.isScheduled;
-    });
+  function getPrimaryText(post) {
+    var title = String(post.title || '').trim();
+    var caption = String(post.caption || '').trim();
+    var description = String(post.description || '').trim();
+    return title || caption || description;
+  }
 
-    if (visiblePosts.length === 0) {
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════
+  function renderPosts() {
+    if (!posts || posts.length === 0) {
       showState('emptyState');
       return;
     }
@@ -616,15 +556,16 @@
     container.innerHTML = '';
 
     var headerCount = document.getElementById('headerCount');
-    headerCount.textContent = visiblePosts.length;
+    headerCount.textContent = posts.length;
     headerCount.style.display = 'inline-block';
 
+    // Group by date
     var groups = {};
     var groupOrder = [];
 
-    visiblePosts.forEach(function(p) {
+    posts.forEach(function(p) {
       var idx = posts.indexOf(p);
-      var dt = parseDateTime(p['תאריך ושעה '] || p['תאריך ושעה'] || '');
+      var dt = parseSchedule(p);
       var key = dt.dateKey || 'no-date';
       if (!groups[key]) {
         groups[key] = { dt: dt, items: [] };
@@ -669,13 +610,13 @@
   }
 
   function buildPostCard(post, idx) {
-    var links     = parseLinks(post['לינק'] || post.link || '');
-    var platforms = parsePlatforms(post['פלטפורמות'] || post.platforms || '');
-    var dt        = parseDateTime(post['תאריך ושעה '] || post['תאריך ושעה'] || '');
-    var caption   = (post['תיאור'] || post.caption || '').toString();
-    var typeLabel = postTypeLabel(post['סוג פוסט'] || post.type || '');
-    var jobIds    = parseJobIds(post['job id'] || post.jobId || '');
-    var hasJobIds = jobIds.length > 0;
+    var platforms = Array.isArray(post.platforms) ? post.platforms : [];
+    var dt        = parseSchedule(post);
+    var primaryText = getPrimaryText(post);
+    var typeLabel = post.post_type === 'video' ? 'וידאו' : (post.post_type === 'photo' ? 'תמונה' : '');
+    var jobIds    = Array.isArray(post.jobIds) ? post.jobIds : [];
+    var previewUrl = post.preview_url || '';
+    var isVid = isVideo(post);
 
     var card = document.createElement('div');
     card.className = 'post-card';
@@ -689,51 +630,34 @@
 
     var timeHtml = dt.time
       ? '<span class="post-time">' + iconClock() + escapeHtml(dt.time) + '</span>'
-      : '<span class="post-time no-time">' + iconClock() + 'ללא שעה</span>';
-
-    var menuDisabled = hasJobIds ? '' : 'disabled';
+      : '';
 
     var mediaHtml = '';
-    if (links.length > 0) {
-      var slidesHtml = links.map(function(src) {
-        if (isVideo(src)) {
-          return '<div class="media-slide">' +
-                   '<video src="' + escapeHtml(src) + '" preload="metadata" playsinline muted></video>' +
-                   '<div class="video-badge">VIDEO</div>' +
-                   '<div class="video-play-overlay">' + iconPlay() + '</div>' +
-                 '</div>';
-        }
-        return '<div class="media-slide"><img src="' + escapeHtml(src) + '" alt="" loading="lazy"></div>';
-      }).join('');
-
-      var dotsHtml = '';
-      var counterHtml = '';
-      if (links.length > 1) {
-        var dots = links.map(function(_, i) {
-          return '<div class="media-dot' + (i === 0 ? ' active' : '') + '"></div>';
-        }).join('');
-        dotsHtml = '<div class="media-dots">' + dots + '</div>';
-        counterHtml = '<div class="media-counter"><span class="counter-current">1</span>/' + links.length + '</div>';
+    if (previewUrl) {
+      if (isVid) {
+        mediaHtml =
+          '<div class="media-wrap">' +
+            '<video src="' + escapeHtml(previewUrl) + '" preload="metadata" playsinline muted></video>' +
+            '<div class="video-badge">VIDEO</div>' +
+            '<div class="video-play-overlay">' + iconPlay() + '</div>' +
+          '</div>';
+      } else {
+        mediaHtml =
+          '<div class="media-wrap">' +
+            '<img src="' + escapeHtml(previewUrl) + '" alt="" loading="lazy">' +
+          '</div>';
       }
-
-      mediaHtml =
-        '<div class="media-wrap">' +
-          '<div class="media-track">' + slidesHtml + '</div>' +
-          counterHtml +
-          dotsHtml +
-        '</div>';
     } else {
       mediaHtml = '<div class="media-wrap"><div class="media-empty">אין מדיה</div></div>';
     }
 
-    var trimmedCaption = caption.trim();
     var typeTagHtml = typeLabel
       ? '<span class="post-type-tag">' + escapeHtml(typeLabel) + '</span>'
       : '';
-    var captionHtml = trimmedCaption
-      ? '<div class="caption-text">' + escapeHtml(trimmedCaption) + '</div>' +
+    var captionHtml = primaryText
+      ? '<div class="caption-text">' + escapeHtml(primaryText) + '</div>' +
         '<button class="see-more" style="display:none;">...הצג עוד</button>'
-      : '<div class="caption-text empty">אין תיאור</div>';
+      : '<div class="caption-text empty">ללא טקסט</div>';
 
     card.innerHTML =
       '<div class="post-top">' +
@@ -741,7 +665,7 @@
           platformsHtml +
           timeHtml +
         '</div>' +
-        '<button class="menu-btn" data-idx="' + idx + '" ' + menuDisabled + '>' + iconDots() + '</button>' +
+        '<button class="menu-btn" data-idx="' + idx + '">' + iconDots() + '</button>' +
       '</div>' +
       '<div class="post-body">' +
         mediaHtml +
@@ -751,24 +675,10 @@
         '</div>' +
       '</div>';
 
-    var track = card.querySelector('.media-track');
-    var dotsEls = card.querySelectorAll('.media-dot');
-    var counterEl = card.querySelector('.counter-current');
-    if (track && links.length > 1) {
-      track.addEventListener('scroll', function() {
-        var i = Math.round(track.scrollLeft / track.clientWidth);
-        if (i < 0) i = 0;
-        if (i >= links.length) i = links.length - 1;
-        dotsEls.forEach(function(d, di) {
-          d.classList.toggle('active', di === i);
-        });
-        if (counterEl) counterEl.textContent = (i + 1);
-      });
-    }
-
+    // see-more
     var captionEl = card.querySelector('.caption-text');
     var seeMoreBtn = card.querySelector('.see-more');
-    if (captionEl && seeMoreBtn && trimmedCaption) {
+    if (captionEl && seeMoreBtn && primaryText) {
       setTimeout(function() {
         if (captionEl.scrollHeight > captionEl.clientHeight + 2) {
           seeMoreBtn.style.display = 'inline-block';
@@ -780,8 +690,9 @@
       });
     }
 
+    // menu
     var menuBtn = card.querySelector('.menu-btn');
-    if (menuBtn && hasJobIds) {
+    if (menuBtn) {
       menuBtn.addEventListener('click', function() {
         haptic('select');
         openActionSheet(idx);
@@ -791,6 +702,9 @@
     return card;
   }
 
+  // ════════════════════════════════════════════════════
+  // ICONS
+  // ════════════════════════════════════════════════════
   function iconCalendar() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
   }
@@ -838,15 +752,9 @@
     return iconShare();
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
+  // ════════════════════════════════════════════════════
+  // MODAL
+  // ════════════════════════════════════════════════════
   function openModal(html) {
     var modal = document.getElementById('modalContent');
     modal.innerHTML = '<div class="modal-handle"></div>' + html;
@@ -862,9 +770,19 @@
   });
 
   function openActionSheet(idx) {
+    var post = posts[idx] || {};
+    var platforms = Array.isArray(post.platforms) ? post.platforms : [];
+    var jobIds = Array.isArray(post.jobIds) ? post.jobIds : [];
+    var multiPlatformNote = '';
+    if (platforms.length > 1) {
+      multiPlatformNote = 'הפעולה תחול על כל ' + platforms.length + ' הפלטפורמות (' + escapeHtml(platforms.join(', ')) + ')';
+    }
+
     openModal(
       '<div class="modal-title">פעולות</div>' +
-      '<div class="modal-text" style="margin-bottom:14px;">בחר פעולה לפוסט</div>' +
+      '<div class="modal-text" style="margin-bottom:14px;">' +
+        (multiPlatformNote || 'בחר פעולה לפוסט') +
+      '</div>' +
       '<button class="sheet-action" id="actEdit">' + iconEdit() + '<span>עריכת תאריך ושעה</span></button>' +
       '<button class="sheet-action danger" id="actDelete">' + iconTrash() + '<span>מחק פוסט</span></button>' +
       '<button class="modal-btn modal-btn-cancel" id="actCancel" style="width:100%; margin-top:6px;">ביטול</button>'
@@ -882,15 +800,21 @@
 
   function openDeleteModal(idx) {
     var post = posts[idx];
-    var typeLabel = postTypeLabel(post['סוג פוסט'] || post.type || '');
-    var dt = parseDateTime(post['תאריך ושעה '] || post['תאריך ושעה'] || '');
+    var platforms = Array.isArray(post.platforms) ? post.platforms : [];
+    var dt = parseSchedule(post);
+    var typeLabel = post.post_type === 'video' ? 'וידאו' : (post.post_type === 'photo' ? 'תמונה' : '');
 
     haptic('warning');
+
+    var platformLine = platforms.length > 1
+      ? '<br>הפוסט יימחק מכל ' + platforms.length + ' הפלטפורמות'
+      : '';
 
     openModal(
       '<div class="modal-title">למחוק את הפוסט?</div>' +
       '<div class="modal-text">' +
-        escapeHtml(typeLabel) + (dt.isScheduled ? ' • ' + escapeHtml(dt.display) : '') +
+        escapeHtml(typeLabel) + (dt.isScheduled ? ' • ' + escapeHtml(dt.date + ' ' + dt.time) : '') +
+        platformLine +
         '<br>פעולה זו לא ניתנת לביטול.' +
       '</div>' +
       '<div class="modal-actions">' +
@@ -911,20 +835,22 @@
 
   function openEditModal(idx) {
     var post = posts[idx];
-    var dt = parseDateTime(post['תאריך ושעה '] || post['תאריך ושעה'] || '');
+    var dt = parseSchedule(post);
+    var platforms = Array.isArray(post.platforms) ? post.platforms : [];
 
     var dateForInput = '';
-    if (dt.date) {
-      var parts = dt.date.split('/');
-      if (parts.length === 3) {
-        dateForInput = parts[2] + '-' + parts[1] + '-' + parts[0];
-      }
+    if (dt.dateKey) {
+      dateForInput = dt.dateKey;
     }
     var timeForInput = dt.time || '';
 
+    var platformLine = platforms.length > 1
+      ? 'התזמון יעודכן בכל ' + platforms.length + ' הפלטפורמות'
+      : 'בחר תאריך ושעה חדשים לפוסט';
+
     openModal(
       '<div class="modal-title">עריכת תזמון</div>' +
-      '<div class="modal-text">בחר תאריך ושעה חדשים לפוסט</div>' +
+      '<div class="modal-text">' + escapeHtml(platformLine) + '</div>' +
       '<div class="input-group">' +
         '<label class="input-label">תאריך</label>' +
         '<input type="date" class="input-field" id="editDate" value="' + escapeHtml(dateForInput) + '">' +
@@ -948,14 +874,11 @@
         showToast('יש לבחור תאריך ושעה');
         return;
       }
-      var dParts = d.split('-');
-      var newScheduledAt = dParts[0] + '-' + dParts[1] + '-' + dParts[2] + 'T' + t + ':00.000+03:00';
-      var displayDate = dParts[2] + '/' + dParts[1] + '/' + dParts[0];
+      // Build ISO with Israel offset
+      var newScheduledAt = d + 'T' + t + ':00.000+03:00';
 
       haptic('success');
       sendAction('edit', idx, {
-        newDate: displayDate,
-        newTime: t,
         newScheduledAt: newScheduledAt
       });
       closeModal();
@@ -968,6 +891,9 @@
     renderPosts();
   }
 
+  // ════════════════════════════════════════════════════
+  // SEND ACTION
+  // ════════════════════════════════════════════════════
   function sendAction(action, idx, extra) {
     var targetUrl = (action === 'delete') ? deleteUrl : editUrl;
     if (!targetUrl) {
@@ -975,16 +901,12 @@
       return;
     }
     var post = posts[idx] || {};
-    var jobIds = parseJobIds(post['job id'] || post.jobId || '');
-    var rowNumber = post.row_number || post.rowNumber || '';
+    var jobIds = Array.isArray(post.jobIds) ? post.jobIds : [];
 
     var payload = {
-      action:        action,
-      jobIds:        jobIds.join(','),
-      rowNumber:     rowNumber,
-      chatId:        chatId,
-      spreadsheetId: spreadsheetId,
-      sheetName:     sheetName
+      action: action,
+      jobIds: jobIds.join(','),
+      chatId: chatId
     };
     if (extra) {
       Object.keys(extra).forEach(function(k) { payload[k] = extra[k]; });
