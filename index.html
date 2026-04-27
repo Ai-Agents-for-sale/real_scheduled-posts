@@ -635,9 +635,10 @@
     var mediaHtml = '';
     if (previewUrl) {
       if (isVid) {
+        // Video: render the thumbnail as image + play overlay + VIDEO badge
         mediaHtml =
           '<div class="media-wrap">' +
-            '<video src="' + escapeHtml(previewUrl) + '" preload="metadata" playsinline muted></video>' +
+            '<img src="' + escapeHtml(previewUrl) + '" alt="" loading="lazy">' +
             '<div class="video-badge">VIDEO</div>' +
             '<div class="video-play-overlay">' + iconPlay() + '</div>' +
           '</div>';
