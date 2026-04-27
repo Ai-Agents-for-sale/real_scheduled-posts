@@ -542,9 +542,13 @@
   if (tg) { tg.ready(); tg.expand(); }
 
   var params = new URLSearchParams(window.location.search);
-  var resumeUrl  = params.get('resumeUrl')  || '';
-  var pollingUrl = params.get('pollingUrl') || '';
-  var chatId     = params.get('chatId')     || '';
+  var resumeUrl     = params.get('resumeUrl')     || '';
+  var pollingUrl    = params.get('pollingUrl')    || '';
+  var editUrl       = params.get('editUrl')       || resumeUrl;
+  var deleteUrl     = params.get('deleteUrl')     || resumeUrl;
+  var chatId        = params.get('chatId')        || '';
+  var spreadsheetId = params.get('spreadsheetId') || '';
+  var sheetName     = params.get('sheetName')     || '';
 
   var posts = [];
 
@@ -591,7 +595,15 @@
       showState('errorState');
       return;
     }
-    var url = pollingUrl + (pollingUrl.indexOf('?') >= 0 ? '&' : '?') + 'chatId=' + encodeURIComponent(chatId);
+    var pollParams = {
+      chatId:        chatId,
+      spreadsheetId: spreadsheetId,
+      sheetName:     sheetName
+    };
+    var pollQs = Object.keys(pollParams).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(pollParams[k] == null ? '' : pollParams[k]);
+    }).join('&');
+    var url = pollingUrl + (pollingUrl.indexOf('?') >= 0 ? '&' : '?') + pollQs;
     fetch(url)
       .then(function(res) { return res.json(); })
       .then(function(data) {
@@ -960,8 +972,10 @@
   // SEND ACTION TO N8N (Image() trick — bypasses CORS)
   // ════════════════════════════════════════════════════
   function sendAction(action, idx, extra) {
-    if (!resumeUrl) {
-      console.warn('No resumeUrl set');
+    // בחר את ה-URL הנכון לפי הפעולה
+    var targetUrl = (action === 'delete') ? deleteUrl : editUrl;
+    if (!targetUrl) {
+      console.warn('No target URL set for action:', action);
       return;
     }
     var post = posts[idx] || {};
@@ -969,10 +983,12 @@
     var rowNumber = post.row_number || post.rowNumber || '';
 
     var payload = {
-      action: action,
-      jobIds: jobIds.join(','),
-      rowNumber: rowNumber,
-      chatId: chatId
+      action:        action,
+      jobIds:        jobIds.join(','),
+      rowNumber:     rowNumber,
+      chatId:        chatId,
+      spreadsheetId: spreadsheetId,
+      sheetName:     sheetName
     };
     if (extra) {
       Object.keys(extra).forEach(function(k) { payload[k] = extra[k]; });
@@ -984,7 +1000,7 @@
 
     var img = new Image();
     img.onload = img.onerror = function() {};
-    img.src = resumeUrl + (resumeUrl.indexOf('?') >= 0 ? '&' : '?') + qs;
+    img.src = targetUrl + (targetUrl.indexOf('?') >= 0 ? '&' : '?') + qs;
   }
 
   // ════════════════════════════════════════════════════
