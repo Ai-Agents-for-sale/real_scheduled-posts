@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>פוסטים מתוזמנים</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #f0f4fb;
+    --surface: #ffffff;
+    --surface2: #e8edf8;
+    --border:  #c8d4e8;
+    --text:    #0D1B4B;
+    --hint:    #4a6080;
+    --text-dim: #8a9ab8;
+    --accent:  #1a3a8f;
+    --accent-soft: rgba(26,58,143,0.09);
+    --accent-glow: rgba(26,58,143,0.15);
+    --green:   #1a7a4a;
+    --green-soft: rgba(26,122,74,0.10);
+    --red:     #b3261e;
+    --red-soft: rgba(179,38,30,0.10);
+    --radius:  14px;
+    --radius-sm: 9px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html, body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    min-height: 100vh;
+  }
+
+  /* ══════════════════════════════════
+     HEADER
+  ══════════════════════════════════ */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(240,244,251,0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(26,58,143,0.4);
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .header-count {
+    margin-right: auto;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(26,58,143,0.15);
+  }
+
+  /* ══════════════════════════════════
+     LOADING / EMPTY
+  ══════════════════════════════════ */
+  .state-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    text-align: center;
+    gap: 14px;
+  }
+
+  .state-screen.active { display: flex; }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .state-text {
+    font-size: 14px;
+    color: var(--hint);
+    font-weight: 500;
+  }
+
+  .empty-icon {
+    font-size: 44px;
+    opacity: 0.5;
+  }
+
+  .empty-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .empty-sub {
+    font-size: 13px;
+    color: var(--hint);
+    line-height: 1.6;
+  }
+
+  /* ══════════════════════════════════
+     POSTS LIST
+  ══════════════════════════════════ */
+  .posts-container {
+    display: none;
+    padding: 16px 14px 40px;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .posts-container.active { display: flex; }
+
+  .post-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(13,27,75,0.04);
+  }
+
+  /* gallery */
+  .gallery {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--surface2);
+    overflow: hidden;
+  }
+
+  .gallery-track {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-behavior: smooth;
+  }
+
+  .gallery-track::-webkit-scrollbar { display: none; }
+
+  .gallery-slide {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface2);
+  }
+
+  .gallery-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .gallery-dots {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    background: rgba(13,27,75,0.55);
+    padding: 5px 9px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .gallery-dot {
+    width: 6px;
+    height: 6px;
+    background: rgba(255,255,255,0.45);
+    border-radius: 50%;
+    transition: background 0.2s;
+  }
+
+  .gallery-dot.active {
+    background: #fff;
+  }
+
+  .gallery-counter {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(13,27,75,0.65);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .post-type-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(255,255,255,0.95);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(26,58,143,0.15);
+  }
+
+  /* card body */
+  .card-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .meta-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    color: var(--accent);
+  }
+
+  .meta-text {
+    flex: 1;
+  }
+
+  .meta-text.muted {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  .platforms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .platform-chip {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1px solid rgba(26,58,143,0.15);
+  }
+
+  .caption {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--surface2);
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .caption.empty {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* actions */
+  .actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 14px;
+  }
+
+  .btn {
+    flex: 1;
+    font-family: 'Heebo', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 11px 0;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .btn-edit {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid rgba(26,58,143,0.2);
+  }
+
+  .btn-delete {
+    background: var(--red-soft);
+    color: var(--red);
+    border: 1px solid rgba(179,38,30,0.2);
+  }
+
+  /* ══════════════════════════════════
+     MODAL — confirm + edit
+  ══════════════════════════════════ */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,27,75,0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+    padding: 0;
+  }
+
+  .modal-backdrop.active { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    width: 100%;
+    max-width: 500px;
+    border-radius: 18px 18px 0 0;
+    padding: 22px 20px 24px;
+    animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    margin: 0 auto 16px;
+  }
+
+  .modal-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .modal-text {
+    font-size: 13px;
+    color: var(--hint);
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 18px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .input-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--hint);
+  }
+
+  .input-field {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 12px;
+    font-family: 'Heebo', sans-serif;
+    font-size: 15px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-field:focus { border-color: var(--accent); }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .modal-btn {
+    flex: 1;
+    font-family: 'Heebo', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 13px 0;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+  }
+
+  .modal-btn:active { transform: scale(0.97); }
+
+  .modal-btn-cancel {
+    background: var(--surface2);
+    color: var(--hint);
+    border: 1px solid var(--border);
+  }
+
+  .modal-btn-confirm {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .modal-btn-danger {
+    background: var(--red);
+    color: #fff;
+  }
+
+  /* ══════════════════════════════════
+     TOAST
+  ══════════════════════════════════ */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--text);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 11px 18px;
+    border-radius: 24px;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(13,27,75,0.25);
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-dot"></span>
+  <span class="header-title">פוסטים מתוזמנים</span>
+  <span class="header-count" id="headerCount" style="display:none;">0</span>
+</div>
+
+<!-- Loading state -->
+<div class="state-screen active" id="loadingState">
+  <div class="spinner"></div>
+  <div class="state-text">טוען פוסטים מתוזמנים...</div>
+</div>
+
+<!-- Empty state -->
+<div class="state-screen" id="emptyState">
+  <div class="empty-icon">📭</div>
+  <div class="empty-title">אין פוסטים מתוזמנים</div>
+  <div class="empty-sub">כשתתזמן פוסטים, הם יופיעו כאן</div>
+</div>
+
+<!-- Error state -->
+<div class="state-screen" id="errorState">
+  <div class="empty-icon">⚠️</div>
+  <div class="empty-title">שגיאה בטעינת הנתונים</div>
+  <div class="empty-sub">נסה לרענן את הדף</div>
+</div>
+
+<!-- Posts list -->
+<div class="posts-container" id="postsContainer"></div>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ════════════════════════════════════════════════════
+  // INIT
+  // ════════════════════════════════════════════════════
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  var params = new URLSearchParams(window.location.search);
+  var resumeUrl  = params.get('resumeUrl')  || '';
+  var pollingUrl = params.get('pollingUrl') || '';
+  var chatId     = params.get('chatId')     || '';
+
+  var posts = [];
+
+  function haptic(type) {
+    if (tg && tg.HapticFeedback) {
+      try {
+        if (type === 'impact')  tg.HapticFeedback.impactOccurred('medium');
+        if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
+        if (type === 'warning') tg.HapticFeedback.notificationOccurred('warning');
+        if (type === 'select')  tg.HapticFeedback.selectionChanged();
+      } catch (e) {}
+    }
+  }
+
+  function showState(stateId) {
+    var states = ['loadingState', 'emptyState', 'errorState'];
+    states.forEach(function(s) {
+      document.getElementById(s).classList.remove('active');
+    });
+    document.getElementById('postsContainer').classList.remove('active');
+    if (stateId === 'posts') {
+      document.getElementById('postsContainer').classList.add('active');
+    } else {
+      document.getElementById(stateId).classList.add('active');
+    }
+  }
+
+  function showToast(msg) {
+    var toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(function() { toast.classList.remove('show'); }, 2200);
+  }
+
+  // ════════════════════════════════════════════════════
+  // POLLING — fetch posts from n8n
+  // ════════════════════════════════════════════════════
+  var pollAttempts = 0;
+  var MAX_POLL_ATTEMPTS = 24; // ~2 minutes at 5s
+
+  function pollForPosts() {
+    pollAttempts++;
+    if (!pollingUrl) {
+      showState('errorState');
+      return;
+    }
+    var url = pollingUrl + (pollingUrl.indexOf('?') >= 0 ? '&' : '?') + 'chatId=' + encodeURIComponent(chatId);
+    fetch(url)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.ready) {
+          posts = Array.isArray(data.posts) ? data.posts : [];
+          renderPosts();
+        } else if (pollAttempts < MAX_POLL_ATTEMPTS) {
+          setTimeout(pollForPosts, 5000);
+        } else {
+          showState('errorState');
+        }
+      })
+      .catch(function() {
+        if (pollAttempts < MAX_POLL_ATTEMPTS) {
+          setTimeout(pollForPosts, 5000);
+        } else {
+          showState('errorState');
+        }
+      });
+  }
+
+  // ════════════════════════════════════════════════════
+  // PARSING HELPERS
+  // ════════════════════════════════════════════════════
+  function parseImages(linkStr) {
+    if (!linkStr) return [];
+    return String(linkStr)
+      .split(/[\n,]+/)
+      .map(function(s) { return s.trim(); })
+      .filter(function(s) { return s.length > 0 && /^https?:\/\//i.test(s); });
+  }
+
+  function parsePlatforms(platformsStr) {
+    if (!platformsStr) return [];
+    return String(platformsStr)
+      .split(/[,،]+/)
+      .map(function(s) { return s.trim(); })
+      .filter(function(s) { return s.length > 0; });
+  }
+
+  function parseJobIds(jobIdStr) {
+    if (!jobIdStr) return [];
+    return String(jobIdStr)
+      .split(/[,\s]+/)
+      .map(function(s) { return s.trim(); })
+      .filter(function(s) { return s.length > 0; });
+  }
+
+  // unify date/time formats:
+  //  "28/04/2026 בשעה 12:21"
+  //  "📅 יום שלישי, 28 באפריל 2026\n🕐 בשעה 09:00"
+  //  "" → not scheduled
+  function parseDateTime(raw) {
+    if (!raw || !String(raw).trim()) {
+      return { display: 'לא מתוזמן', date: '', time: '', isScheduled: false };
+    }
+    var s = String(raw).trim();
+    // Try DD/MM/YYYY pattern
+    var dmy = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    // Try time HH:MM
+    var t = s.match(/(\d{1,2}):(\d{2})/);
+
+    var date = dmy ? (dmy[1].padStart(2,'0') + '/' + dmy[2].padStart(2,'0') + '/' + dmy[3]) : '';
+    var time = t ? (t[1].padStart(2,'0') + ':' + t[2]) : '';
+
+    // Try to parse Hebrew month format if no DD/MM/YYYY
+    if (!date) {
+      var hebMonths = {
+        'ינואר':'01','פברואר':'02','מרץ':'03','אפריל':'04','מאי':'05','יוני':'06',
+        'יולי':'07','אוגוסט':'08','ספטמבר':'09','אוקטובר':'10','נובמבר':'11','דצמבר':'12'
+      };
+      var hm = s.match(/(\d{1,2})\s*ב?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)\s*(\d{4})/);
+      if (hm) {
+        date = hm[1].padStart(2,'0') + '/' + hebMonths[hm[2]] + '/' + hm[3];
+      }
+    }
+
+    var display = '';
+    if (date && time) display = date + ' • ' + time;
+    else if (date) display = date;
+    else if (time) display = time;
+    else display = s; // fallback to raw if we can't parse
+
+    return { display: display, date: date, time: time, isScheduled: true };
+  }
+
+  function postTypeLabel(type) {
+    if (!type) return 'פוסט';
+    return String(type).trim();
+  }
+
+  // ════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════
+  function renderPosts() {
+    if (!posts || posts.length === 0) {
+      showState('emptyState');
+      return;
+    }
+
+    var container = document.getElementById('postsContainer');
+    container.innerHTML = '';
+
+    var headerCount = document.getElementById('headerCount');
+    headerCount.textContent = posts.length;
+    headerCount.style.display = 'inline-block';
+
+    posts.forEach(function(post, idx) {
+      var card = buildPostCard(post, idx);
+      container.appendChild(card);
+    });
+
+    showState('posts');
+  }
+
+  function buildPostCard(post, idx) {
+    var images   = parseImages(post['לינק'] || post.link || '');
+    var platforms = parsePlatforms(post['פלטפורמות'] || post.platforms || '');
+    var dt        = parseDateTime(post['תאריך ושעה '] || post['תאריך ושעה'] || post.scheduledAt || '');
+    var caption   = (post['תיאור'] || post.caption || '').toString();
+    var typeLabel = postTypeLabel(post['סוג פוסט'] || post.type || '');
+    var jobIds    = parseJobIds(post['job id'] || post.jobId || '');
+    var rowNumber = post.row_number || post.rowNumber || '';
+
+    var card = document.createElement('div');
+    card.className = 'post-card';
+
+    // Gallery
+    var galleryHtml = '';
+    if (images.length > 0) {
+      var slidesHtml = images.map(function(src) {
+        return '<div class="gallery-slide"><img src="' + escapeHtml(src) + '" alt=""></div>';
+      }).join('');
+
+      var dotsHtml = '';
+      if (images.length > 1) {
+        var dots = images.map(function(_, i) {
+          return '<div class="gallery-dot' + (i === 0 ? ' active' : '') + '"></div>';
+        }).join('');
+        dotsHtml = '<div class="gallery-dots">' + dots + '</div>';
+      }
+
+      var counterHtml = images.length > 1
+        ? '<div class="gallery-counter"><span class="counter-current">1</span> / ' + images.length + '</div>'
+        : '';
+
+      galleryHtml =
+        '<div class="gallery">' +
+          '<div class="post-type-badge">' + escapeHtml(typeLabel) + '</div>' +
+          counterHtml +
+          '<div class="gallery-track">' + slidesHtml + '</div>' +
+          dotsHtml +
+        '</div>';
+    } else {
+      galleryHtml =
+        '<div class="gallery" style="display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:13px;">' +
+          '<div class="post-type-badge">' + escapeHtml(typeLabel) + '</div>' +
+          'אין תמונה' +
+        '</div>';
+    }
+
+    // Platforms
+    var platformsHtml = platforms.length > 0
+      ? '<div class="platforms">' + platforms.map(function(p) {
+          return '<span class="platform-chip">' + escapeHtml(p) + '</span>';
+        }).join('') + '</div>'
+      : '<span class="meta-text muted">לא צוינו פלטפורמות</span>';
+
+    // Caption
+    var captionHtml = caption.trim()
+      ? '<div class="caption">' + escapeHtml(caption) + '</div>'
+      : '<div class="caption empty">אין תיאור</div>';
+
+    // Card body
+    card.innerHTML =
+      galleryHtml +
+      '<div class="card-body">' +
+        '<div class="meta-row">' +
+          iconCalendar() +
+          '<div class="meta-text' + (dt.isScheduled ? '' : ' muted') + '">' + escapeHtml(dt.display) + '</div>' +
+        '</div>' +
+        '<div class="meta-row">' +
+          iconShare() +
+          '<div class="meta-text">' + platformsHtml + '</div>' +
+        '</div>' +
+        '<div class="meta-row">' +
+          iconCaption() +
+          '<div class="meta-text">' + captionHtml + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="actions">' +
+        '<button class="btn btn-edit" data-action="edit" data-idx="' + idx + '">' +
+          iconEdit() + ' עריכה' +
+        '</button>' +
+        '<button class="btn btn-delete" data-action="delete" data-idx="' + idx + '">' +
+          iconTrash() + ' מחיקה' +
+        '</button>' +
+      '</div>';
+
+    // Wire gallery interactions
+    var track = card.querySelector('.gallery-track');
+    var dotsEls = card.querySelectorAll('.gallery-dot');
+    var counterEl = card.querySelector('.counter-current');
+    if (track && images.length > 1) {
+      track.addEventListener('scroll', function() {
+        var idx2 = Math.round(track.scrollLeft / track.clientWidth);
+        if (idx2 < 0) idx2 = 0;
+        if (idx2 >= images.length) idx2 = images.length - 1;
+        dotsEls.forEach(function(d, i) {
+          d.classList.toggle('active', i === idx2);
+        });
+        if (counterEl) counterEl.textContent = (idx2 + 1);
+      });
+    }
+
+    // Wire buttons
+    card.querySelectorAll('.btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var action = btn.getAttribute('data-action');
+        var i = parseInt(btn.getAttribute('data-idx'), 10);
+        haptic('select');
+        if (action === 'edit') openEditModal(i);
+        if (action === 'delete') openDeleteModal(i);
+      });
+    });
+
+    return card;
+  }
+
+  // ════════════════════════════════════════════════════
+  // ICONS (inline SVG)
+  // ════════════════════════════════════════════════════
+  function iconCalendar() {
+    return '<svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  }
+  function iconShare() {
+    return '<svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+  }
+  function iconCaption() {
+    return '<svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  }
+  function iconEdit() {
+    return '<svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  }
+  function iconTrash() {
+    return '<svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ════════════════════════════════════════════════════
+  // MODALS
+  // ════════════════════════════════════════════════════
+  function openModal(html) {
+    var modal = document.getElementById('modalContent');
+    modal.innerHTML = '<div class="modal-handle"></div>' + html;
+    document.getElementById('modalBackdrop').classList.add('active');
+  }
+
+  function closeModal() {
+    document.getElementById('modalBackdrop').classList.remove('active');
+  }
+
+  document.getElementById('modalBackdrop').addEventListener('click', function(e) {
+    if (e.target.id === 'modalBackdrop') closeModal();
+  });
+
+  function openDeleteModal(idx) {
+    var post = posts[idx];
+    var typeLabel = postTypeLabel(post['סוג פוסט'] || post.type || '');
+    var dt = parseDateTime(post['תאריך ושעה '] || post['תאריך ושעה'] || '');
+
+    haptic('warning');
+
+    openModal(
+      '<div class="modal-title">למחוק את הפוסט?</div>' +
+      '<div class="modal-text">' +
+        escapeHtml(typeLabel) + (dt.isScheduled ? ' • ' + escapeHtml(dt.display) : '') +
+        '<br>פעולה זו לא ניתנת לביטול.' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="modal-btn modal-btn-cancel" id="cancelBtn">ביטול</button>' +
+        '<button class="modal-btn modal-btn-danger" id="confirmBtn">מחק</button>' +
+      '</div>'
+    );
+
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
+    document.getElementById('confirmBtn').addEventListener('click', function() {
+      haptic('success');
+      sendAction('delete', idx, {});
+      closeModal();
+      removeCardFromUI(idx);
+      showToast('הפוסט נמחק');
+    });
+  }
+
+  function openEditModal(idx) {
+    var post = posts[idx];
+    var dt = parseDateTime(post['תאריך ושעה '] || post['תאריך ושעה'] || '');
+
+    // convert DD/MM/YYYY → YYYY-MM-DD for date input
+    var dateForInput = '';
+    if (dt.date) {
+      var parts = dt.date.split('/');
+      if (parts.length === 3) {
+        dateForInput = parts[2] + '-' + parts[1] + '-' + parts[0];
+      }
+    }
+    var timeForInput = dt.time || '';
+
+    openModal(
+      '<div class="modal-title">עריכת תזמון</div>' +
+      '<div class="modal-text">בחר תאריך ושעה חדשים לפוסט</div>' +
+      '<div class="input-group">' +
+        '<label class="input-label">תאריך</label>' +
+        '<input type="date" class="input-field" id="editDate" value="' + escapeHtml(dateForInput) + '">' +
+      '</div>' +
+      '<div class="input-group">' +
+        '<label class="input-label">שעה</label>' +
+        '<input type="time" class="input-field" id="editTime" value="' + escapeHtml(timeForInput) + '">' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="modal-btn modal-btn-cancel" id="cancelBtn">ביטול</button>' +
+        '<button class="modal-btn modal-btn-confirm" id="confirmBtn">שמור</button>' +
+      '</div>'
+    );
+
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
+    document.getElementById('confirmBtn').addEventListener('click', function() {
+      var d = document.getElementById('editDate').value;
+      var t = document.getElementById('editTime').value;
+      if (!d || !t) {
+        haptic('warning');
+        showToast('יש לבחור תאריך ושעה');
+        return;
+      }
+      // Build ISO with Israel offset (matches existing pattern)
+      var dParts = d.split('-'); // YYYY-MM-DD
+      var newScheduledAt = dParts[0] + '-' + dParts[1] + '-' + dParts[2] + 'T' + t + ':00.000+03:00';
+      var displayDate = dParts[2] + '/' + dParts[1] + '/' + dParts[0];
+
+      haptic('success');
+      sendAction('edit', idx, {
+        newDate: displayDate,
+        newTime: t,
+        newScheduledAt: newScheduledAt
+      });
+      closeModal();
+      showToast('התזמון עודכן');
+    });
+  }
+
+  function removeCardFromUI(idx) {
+    posts.splice(idx, 1);
+    renderPosts();
+  }
+
+  // ════════════════════════════════════════════════════
+  // SEND ACTION TO N8N (Image() trick — bypasses CORS)
+  // ════════════════════════════════════════════════════
+  function sendAction(action, idx, extra) {
+    if (!resumeUrl) {
+      console.warn('No resumeUrl set');
+      return;
+    }
+    var post = posts[idx] || {};
+    var jobIds = parseJobIds(post['job id'] || post.jobId || '');
+    var rowNumber = post.row_number || post.rowNumber || '';
+
+    var payload = {
+      action: action,
+      jobIds: jobIds.join(','),
+      rowNumber: rowNumber,
+      chatId: chatId
+    };
+    if (extra) {
+      Object.keys(extra).forEach(function(k) { payload[k] = extra[k]; });
+    }
+
+    var qs = Object.keys(payload).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(payload[k] == null ? '' : payload[k]);
+    }).join('&');
+
+    var img = new Image();
+    img.onload = img.onerror = function() {};
+    img.src = resumeUrl + (resumeUrl.indexOf('?') >= 0 ? '&' : '?') + qs;
+  }
+
+  // ════════════════════════════════════════════════════
+  // START
+  // ════════════════════════════════════════════════════
+  pollForPosts();
+</script>
+
+</body>
+</html>
